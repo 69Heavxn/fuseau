@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<!-- CSP proche de Lightning : pas de style inline dans les <style> injectés, Trusted Types exigé -->
+<meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-hashes' 'sha256-dummy'; require-trusted-types-for 'script'">
+<title>Piste | Salesforce (maquette)</title>
+<link rel="stylesheet" href="mock.css">
+</head>
+<body>
+<div class="tabs">
+  <!-- onglet caché (Salesforce garde les anciennes fiches dans la page) -->
+  <div class="record hidden">
+    <records-record-layout-item><div class="slds-form-element"><span class="slds-form-element__label">Téléphone mobile</span>
+    <div class="slds-form-element__control"><lightning-formatted-phone><a href="tel:+33199999999">+33 1 99 99 99 99</a></lightning-formatted-phone></div></div></records-record-layout-item>
+  </div>
+  <div class="record">
+    <h2>Madame Jeanne Exemple</h2>
+    <records-record-layout-item><div class="slds-form-element"><span class="slds-form-element__label">Canal d'entrée</span>
+    <div class="slds-form-element__control">Internet - formulaire</div></div></records-record-layout-item>
+    <records-record-layout-item><div class="slds-form-element"><span class="slds-form-element__label">Appeler le client</span>
+    <div class="slds-form-element__control"><a href="#">0612345678</a></div></div></records-record-layout-item>
+    <records-record-layout-item><div class="slds-form-element"><span class="slds-form-element__label">Échéance</span>
+    <div class="slds-form-element__control">16/11/2026</div></div></records-record-layout-item>
+    <records-record-layout-item><div class="slds-form-element"><span class="slds-form-element__label">Adresse e-mail</span>
+    <div class="slds-form-element__control"><a href="mailto:jeanne.exemple@example.fr">jeanne.exemple@example.fr</a></div></div></records-record-layout-item>
+    <records-record-layout-item><div class="slds-form-element"><span class="slds-form-element__label">Téléphone mobile</span>
+    <div class="slds-form-element__control"><lightning-formatted-phone><a href="tel:0612345678">0612345678</a></lightning-formatted-phone></div></div></records-record-layout-item>
+    <records-record-layout-item><div class="slds-form-element"><span class="slds-form-element__label">Téléphone</span>
+    <div class="slds-form-element__control" id="shadowhost"></div></div></records-record-layout-item>
+    <records-record-layout-item><div class="slds-form-element"><span class="slds-form-element__label">Tentatives de contact</span>
+    <div class="slds-form-element__control">3</div></div></records-record-layout-item>
+  </div>
+</div>
+<script src="mock.js"></script>
+</body>
+</html>

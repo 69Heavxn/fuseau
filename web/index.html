@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fuseau</title>
+<meta name="description" content="Pays, région et heure locale d'un numéro de téléphone, même sans indicatif.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%232e844a'/%3E%3Cpath d='M8 8V1a7 7 0 0 1 6.06 3.5z' fill='%23dd7a01'/%3E%3C/svg%3E">
+<style>
+  :root { --ink:#181818; --muted:#5c5c5c; --line:#e3e3e0; --bg:#f4f3ef; --card:#fff; --accent:#0b5cab; --green:#2e844a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px 64px; }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .logo { width: 18px; height: 18px; border-radius: 50%; background: conic-gradient(#2e844a 0 37.5%, #dd7a01 0 50%, #c23934 0 100%); }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -.3px; }
+  #clock { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; }
+  .lead { color: var(--muted); margin: 0 0 20px; }
+  #num { width: 100%; font: 600 22px/1.2 ui-monospace, Menlo, Consolas, monospace; padding: 14px 16px; border: 1px solid #c9c9c9; border-radius: 10px; background: #fff; color: var(--ink); outline: none; }
+  #num:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(11,92,171,.15); }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 10px 2px 18px; font-size: 13px; color: var(--muted); }
+  .opts label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .try { display: flex; flex-wrap: wrap; gap: 6px; }
+  .try button { font: 12px ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--line); background: #fff; border-radius: 14px; padding: 3px 9px; cursor: pointer; color: var(--ink); }
+  .try button:hover { border-color: var(--accent); }
+  #out { margin-bottom: 36px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin-top: 16px; }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  ol { padding-left: 20px; margin: 8px 0; } li { margin: 4px 0; }
+  .bm { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; background: var(--ink); color: #fff; text-decoration: none; padding: 9px 16px; border-radius: 8px; cursor: grab; }
+  .bm[aria-disabled] { opacity: .4; pointer-events: none; }
+  .bm .logo { width: 12px; height: 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+  .secondary { font: inherit; font-size: 13px; border: 1px solid #c9c9c9; background: #fff; color: var(--accent); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+  .secondary:disabled { opacity: .5; cursor: default; }
+  small, .muted { color: var(--muted); font-size: 13px; }
+  kbd { font: 12px ui-monospace, Menlo, Consolas, monospace; background: #f0f0ed; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+  .shake { animation: shake .5s; }
+  @keyframes shake { 20%,60% { transform: translateX(-5px); } 40%,80% { transform: translateX(5px); } }
+  .legend { display: grid; gap: 4px; font-size: 14px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+  footer { margin-top: 28px; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header><span class="logo"></span><h1>Fuseau</h1><span id="clock"></span></header>
+  <p class="lead">Colle un numéro, même sans indicatif : pays, région, heure sur place et numéro corrigé.</p>
+
+  <input id="num" type="text" inputmode="tel" placeholder="ex. 0612345678 ou +1 514 555 0123" autocomplete="off" spellcheck="false" aria-label="Numéro de téléphone">
+  <div class="opts">
+    <label><input id="auto" type="checkbox"> Lire le presse-papier quand je reviens sur cette page</label>
+  </div>
+  <div class="opts try" aria-label="Exemples (numéros fictifs)">
+    <span>Essayer :</span>
+    <button data-try="0612345678">0612345678</button>
+    <button data-try="001-514-555-0147">001-514-555-0147</button>
+    <button data-try="0692 12 34 56">0692 12 34 56</button>
+    <button data-try="0470 12 34 56">0470 12 34 56</button>
+    <button data-try="+1 208 555 0134">+1 208 555 0134</button>
+    <button data-try="+417612345678">+417612345678</button>
+  </div>
+  <div id="out" class="fz"></div>
+
+  <section>
+    <h2>Le favori pour Salesforce</h2>
+    <p class="muted" style="margin-top:0">Un clic sur la fiche : la bulle trouve le numéro tout seul. Rien à installer, c'est un simple favori.</p>
+    <div class="row">
+      <a id="bm" class="bm" href="#" aria-disabled="true" title="Glisse-moi dans ta barre de favoris"><span class="logo"></span>Fuseau</a>
+      <span id="bmhint" class="muted">← glisse ce bouton dans ta barre de favoris</span>
+    </div>
+    <p id="bmerr" class="muted" hidden>Le favori n'a pas pu être chargé. Ouvre cette page depuis son adresse en ligne (pas depuis un fichier).</p>
+    <ol>
+      <li>Affiche la barre de favoris : <kbd>Ctrl</kbd>+<kbd>Maj</kbd>+<kbd>B</kbd>.</li>
+      <li>Glisse le bouton noir <b>Fuseau</b> dans la barre.</li>
+      <li>Sur une fiche Salesforce, clique sur <b>Fuseau</b>. La bulle se ferme avec <kbd>Échap</kbd> ou ×.</li>
+    </ol>
+    <p class="muted">Si le glisser ne marche pas : <button id="copybm" class="secondary" type="button" disabled>Copier le code du favori</button>, puis clic droit sur la barre de favoris → <i>Ajouter une page…</i>, nom « Fuseau », colle le code dans « URL ».</p>
+    <p class="muted">Pour appeler : clique sur le numéro corrigé (il se sélectionne), puis clic droit → <i>Call</i> comme d'habitude. Ou bouton <b>Copier</b>. Si le favori ne trouve pas le numéro, sélectionne-le à la souris avant de cliquer.</p>
+  </section>
+
+  <section>
+    <h2>Lire le résultat</h2>
+    <div class="legend">
+      <div><i style="background:#2e844a"></i>Entre 9h et 18h chez le client : on peut appeler.</div>
+      <div><i style="background:#dd7a01"></i>Ça ouvre dans moins d'1 h 30 : l'heure de rappel est indiquée.</div>
+      <div><i style="background:#c23934"></i>Trop tôt ou trop tard : rappel indiqué en heure de chez toi.</div>
+    </div>
+    <p class="muted">Sans indicatif, un numéro peut exister dans plusieurs pays. Fuseau affiche le plus probable avec un pourcentage (selon votre clientèle : France, Canada, USA, Suisse, Belgique, Luxembourg, outre-mer…) et les autres possibilités en dessous.</p>
+    <p class="muted">Tout est calculé dans ton navigateur : aucun numéro n'est envoyé nulle part.</p>
+  </section>
+
+  <footer><small>Fuseau __VERSION__ · données de numérotation : Google libphonenumber</small></footer>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

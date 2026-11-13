@@ -1,0 +1,20 @@
+{
+  "name": "fuseau",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "data": "node scripts/build-data.mjs",
+    "fetch-data": "sh scripts/fetch-data.sh"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "esbuild": "0.24.2",
+    "libphonenumber-js": "1.13.16"
+  }
+}

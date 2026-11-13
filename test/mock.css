@@ -1,0 +1,6 @@
+body { font: 13px Arial, sans-serif; background: #b0c4df; margin: 0; padding: 70px 20px; }
+.record { background: #fff; border-radius: 4px; padding: 16px; max-width: 900px; }
+.slds-form-element { display: grid; grid-template-columns: 200px 1fr; border-bottom: 1px solid #ddd; padding: 6px 0; }
+.slds-form-element__label { color: #555; font-size: 12px; }
+a { color: #0b5cab; }
+.hidden { display: none; }
