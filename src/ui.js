@@ -1,6 +1,7 @@
 // Rendu des résultats (DOM construit à la main : pas d'innerHTML, compatible
 // avec les pages qui imposent Trusted Types / CSP strictes comme Salesforce).
 import { zoneInfo, zoneLabel } from './time.js';
+import { ALT_MIN_PCT } from './config.js';
 
 export const CSS = `
 :host, .fz { all: initial; }
@@ -46,10 +47,12 @@ button { font: inherit; cursor: pointer; }
 .row .l { color: var(--muted); font-size: 12px; }
 .row .s { grid-column: 2 / 4; font-size: 12px; font-weight: 600; margin-top: -2px; }
 .row .s.green { color: var(--green); } .row .s.orange { color: var(--orange); } .row .s.red { color: var(--red); }
-details.alts { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 6px; }
-details.alts summary { cursor: pointer; color: var(--accent); font-size: 12px; font-weight: 600; list-style: none; }
-details.alts summary::-webkit-details-marker { display: none; }
-details.alts summary::before { content: "▸ "; } details.alts[open] summary::before { content: "▾ "; }
+.doubt { margin-top: 10px; padding: 9px 10px 4px; background: var(--orange-bg); border-radius: 6px; font-size: 12px; color: #6b3600; }
+.doubt b { font-size: 13px; color: #7a3d00; }
+.doubt .alts { margin-top: 8px; }
+.doubt .alts-h { font-weight: 600; margin-bottom: 2px; }
+.doubt .alt { border-bottom-color: rgba(180, 90, 0, .15); }
+.doubt .alt .num { background: rgba(255, 255, 255, .7); }
 .alt { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 8px; padding: 7px 0; border-bottom: 1px solid #f0f0f0; align-items: center; }
 .alt:last-child { border-bottom: 0; }
 .alt .n { font-weight: 600; } .alt .pct { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -151,7 +154,7 @@ function timeBlock(c, now) {
           info.weekend && h('span', { class: 'badge' }, 'week-end'),
         ),
         h('div', { class: `status ${info.status}` }, h('i', { class: `dot ${info.status}` }), info.statusText),
-        h('div', { class: 'diff' }, `${labels[0]} · ${info.diffText}`),
+        info.diffMin !== 0 && h('div', { class: 'diff' }, info.diffText),
       ],
     };
   }
@@ -193,12 +196,16 @@ function placeText(c) {
   return parts.join(' · ');
 }
 
-function confidence(c) {
-  if (!c.valid) return h('div', { class: 'conf unsure' }, c.howText);
-  if (c.certain) return h('div', { class: 'conf' }, `Certain · ${c.howText}`);
-  const word = c.pct >= 85 ? 'Très probable' : c.pct >= 60 ? 'Probable' : 'Incertain, à vérifier avec le client';
-  return h('div', { class: `conf${c.pct < 60 ? ' unsure' : ''}` },
-    `${word} · ${c.pct} % · ${c.howText}${c.hinted ? ' · confirmé par l’e-mail' : ''}`);
+// Encadré affiché seulement quand le pays n'est pas sûr.
+function doubtBox(top, alts, now) {
+  const head = top.valid
+    ? [h('b', null, `Pays à vérifier : ${top.countryName} à ${top.pct} %`), ` · ${top.howText}`]
+    : [h('b', null, 'Numéro non reconnu'), ' : pays possibles d’après la longueur'];
+  return h('div', { class: 'doubt' },
+    h('div', null, head),
+    alts.length > 0 && h('div', { class: 'alts' },
+      h('div', { class: 'alts-h' }, 'Autres possibilités :'),
+      alts.map((c) => altRow(c, now))));
 }
 
 function altRow(c, now) {
@@ -237,7 +244,11 @@ export function renderCard(res, opts = {}) {
     return h('div', { class: 'card bad' }, src, res.warnings.map((w) => h('div', { class: 'warn' }, w)));
   }
   const tb = timeBlock(top, now);
-  const alts = res.candidates.slice(1).filter((c) => c.pct == null || c.pct >= 2).slice(0, 4);
+  // numéro clair : uniquement l'essentiel ; sinon probabilités + autres pays
+  const doubt = !res.clear && (top.valid || res.candidates.length > 1);
+  const alts = doubt
+    ? res.candidates.slice(1).filter((c) => c.pct == null || c.pct >= ALT_MIN_PCT).slice(0, 3)
+    : [];
   const card = h('div', { class: `card ${top.valid ? tb.status : 'bad'}`, 'data-key': res.digits },
     src,
     tb.el,
@@ -249,11 +260,8 @@ export function renderCard(res, opts = {}) {
     placeText(top) && h('div', { class: 'place' }, placeText(top)),
     top.zonesNote && h('div', { class: 'note' }, top.zonesNote),
     numberRow(top),
-    confidence(top),
     res.warnings.map((w) => h('div', { class: 'warn' }, w)),
-    alts.length > 0 && h('details', { class: 'alts', open: opts.openAlts ?? (!top.certain && top.pct < 85) },
-      h('summary', null, `Autres possibilités (${alts.length})`),
-      alts.map((c) => altRow(c, now))),
+    doubt && doubtBox(top, alts, now),
   );
   return card;
 }

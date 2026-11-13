@@ -65,6 +65,7 @@ export function zoneInfo(tz, now = new Date()) {
     weekday: weekdayName(tz, now),
     weekend: t.wd === 0 || t.wd === 6,
     dayDiff,
+    diffMin: t.offset - here.offset,
     diffText: fmtDiff(t.offset - here.offset),
   };
   if (minutes >= start && minutes < end) {

@@ -36,3 +36,23 @@ export const HOW_WEIGHT = {
 
 // Indice tiré de l'adresse e-mail (.ca, .be…) : multiplie la probabilité du pays.
 export const EMAIL_HINT_FACTOR = 3;
+// Pays dont l'e-mail ne prouve rien : les expatriés gardent leur adresse française.
+export const EMAIL_HINT_IGNORE = ['FR'];
+
+// Les formulaires sont surtout remplis avec des portables : bonus aux numéros mobiles.
+export const MOBILE_BONUS = 2;
+
+// Tranches qui existent mais que les particuliers n'ont quasiment jamais
+// (début du numéro national, sans le 0) : probabilité divisée par 5.
+export const RARE_RANGES = {
+  CH: ['68', '69'], // mobiles suisses récents ; les vrais portables sont en 075-079
+};
+
+// Numéro jugé clair (la bulle n'affiche que l'essentiel) si le pays en tête
+// dépasse CLEAR_THRESHOLD %, ou dépasse CLEAR_LEAD % sans autre pays au-dessus
+// de CLEAR_RUNNER_UP %. Sinon : probabilités + autres pays possibles.
+export const CLEAR_THRESHOLD = 80;
+export const CLEAR_LEAD = 70;
+export const CLEAR_RUNNER_UP = 10;
+// Autres pays affichés seulement s'ils dépassent ce pourcentage (3 au maximum).
+export const ALT_MIN_PCT = 5;

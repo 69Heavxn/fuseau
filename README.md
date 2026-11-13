@@ -33,6 +33,11 @@ Sinon, bouton « Copier un diagnostic » et envoyer le texte (il ne contient auc
 4. Numéro invalide : le pays est quand même donné quand l'indicatif est connu, avec
    l'erreur probable (ex. « un chiffre en trop »).
 
+Quand le pays est clair, la bulle n'affiche que l'essentiel (heure, couleur, pays,
+lieu, numéro corrigé). Les probabilités et les autres pays possibles n'apparaissent
+que si le numéro est difficile à vérifier (ex. 079… France ou Suisse ?). Les seuils
+sont réglables dans `src/config.js`.
+
 Le fuseau vient de l'indicatif régional (USA/Canada par indicatif, Brésil, Mexique,
 Australie, Espagne/Canaries, Portugal/Açores…). Quand un indicatif couvre plusieurs
 fuseaux, toutes les heures sont affichées.

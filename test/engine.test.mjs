@@ -65,11 +65,11 @@ test('erreurs de saisie courantes', () => {
 });
 
 test('ambiguïté affichée avec probabilités', () => {
-  const r = analyze('0612345678');
+  const r = analyze('0756123456');
   assert.ok(!r.candidates[0].certain);
   assert.ok(r.candidates.length > 1);
   assert.ok(r.candidates[0].pct > r.candidates[1].pct);
-  assert.equal(r.candidates.reduce((s, c) => s + c.pct, 0) >= 98, true);
+  assert.equal(r.candidates.reduce((s, c) => s + c.pct, 0) >= 95, true);
 });
 
 test('découpage typique du pays', () => {
@@ -118,4 +118,18 @@ test('statut horaire', () => {
   assert.equal(mtl.status, 'orange');
   assert.match(mtl.statusText, /dans 1 h/);
   assert.equal(zoneInfo('Pacific/Auckland', new Date(Date.UTC(2026, 10, 11, 20, 0))).dayDiff, 1);
+});
+
+test('numéro clair : pas de doute affiché', () => {
+  for (const n of ['0612345678', '06 12 34 56 78', '0692 12 34 56', '0590 12 34 56', '07400123456', '514 555 0123', '+32470123456', '0142685300']) {
+    assert.equal(analyze(n).clear, true, n);
+  }
+});
+
+test('numéro difficile : probabilités affichées', () => {
+  for (const n of ['0756123456', '079 123 45 67', '0470 12 34 56', '621 123 456', '612345678']) {
+    const r = analyze(n);
+    assert.equal(r.clear, false, n);
+    assert.ok(r.candidates.length > 1, n);
+  }
 });

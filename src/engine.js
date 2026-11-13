@@ -10,7 +10,9 @@ import {
 import examples from 'libphonenumber-js/examples.mobile.json';
 import { TZ, ZONES, MOBILE_ZONES } from './data/tz.js';
 import { GEO } from './data/geo.js';
-import { COUNTRY_PRIOR, DEFAULT_PRIOR, HOW_WEIGHT, EMAIL_HINT_FACTOR } from './config.js';
+import { COUNTRY_PRIOR, DEFAULT_PRIOR, HOW_WEIGHT, EMAIL_HINT_FACTOR, EMAIL_HINT_IGNORE, MOBILE_BONUS,
+  RARE_RANGES, CLEAR_THRESHOLD, CLEAR_LEAD, CLEAR_RUNNER_UP,
+} from './config.js';
 
 const COUNTRIES = getCountries();
 const meta = new Metadata();
@@ -63,7 +65,7 @@ const HOW_TEXT = {
   plus: (cc) => `indicatif +${cc} saisi`,
   intl00: (cc) => `indicatif 00${cc} saisi`,
   intl011: (cc) => `préfixe nord-américain 011 + indicatif ${cc}`,
-  trunk: () => 'format national (avec le 0)',
+  trunk: () => 'format national avec le 0',
   bareNoTrunk: () => 'format national',
   bareMissingTrunk: () => 'format national sans le 0 du début',
   ccNoPlus: (cc) => `indicatif ${cc} écrit sans + ni 00`,
@@ -152,7 +154,8 @@ export function analyze(raw, ctx = {}) {
   if (digits.length < 6) { res.status = 'empty'; return res; }
   if (digits.length > 17) { res.status = 'invalid'; res.warnings.push('Trop de chiffres pour un numéro de téléphone.'); return res; }
 
-  const hint = emailCountry(ctx.email);
+  const emailCc = emailCountry(ctx.email);
+  const hint = emailCc && !EMAIL_HINT_IGNORE.includes(emailCc) ? emailCc : null;
   const groups = groupsOf(raw);
   const cands = new Map();
   const add = (p, how) => {
@@ -167,8 +170,12 @@ export function analyze(raw, ctx = {}) {
       // même découpage que l'usage local (06 12 34 56 78 / 514 555 0123 / 0470 12 34 56)
       if (groups && sameGroups(groups, p, how)) w *= GROUPING_BONUS;
       // longueur inhabituelle pour le pays (ex. numéro à 10 chiffres au Luxembourg)
+      const type = p.getType();
       const typ = typicalLength(c);
-      if (typ && p.nationalNumber.length !== typ && p.getType() !== 'MOBILE') w *= 0.35;
+      if (typ && p.nationalNumber.length !== typ && type !== 'MOBILE') w *= 0.35;
+      // les formulaires sont surtout remplis avec des portables
+      if (type === 'MOBILE') w *= MOBILE_BONUS;
+      if ((RARE_RANGES[c] || []).some((r) => p.nationalNumber.startsWith(r))) w *= 0.2;
     }
     const prev = cands.get(p.number);
     if (prev && prev.weight >= w) return;
@@ -242,6 +249,9 @@ export function analyze(raw, ctx = {}) {
     });
     const top = res.candidates[0];
     top.certain = res.explicit || top.pct >= 97;
+    // clair = pas besoin d'afficher de doute ni d'autres pays
+    const second = res.candidates[1] ? res.candidates[1].pct : 0;
+    res.clear = top.certain || top.pct >= CLEAR_THRESHOLD || (top.pct >= CLEAR_LEAD && second < CLEAR_RUNNER_UP);
     res.status = 'ok';
     if (ext) res.warnings.push(`Poste ${ext} indiqué après le numéro.`);
     return res;
