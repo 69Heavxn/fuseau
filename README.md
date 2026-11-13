@@ -14,7 +14,7 @@ Tout est calculé dans le navigateur : aucun numéro n'est envoyé nulle part.
 
 ## Installer le favori
 
-1. Ouvrir la page (GitHub Pages) et afficher la barre de favoris : `Ctrl`+`Maj`+`B`.
+1. Ouvrir https://69heavxn.github.io/fuseau/ et afficher la barre de favoris : `Ctrl`+`Maj`+`B`.
 2. Glisser le bouton noir **Fuseau** dans la barre de favoris.
 3. Sur une fiche Salesforce : clic sur **Fuseau**. `Échap` ou × pour fermer.
 
