@@ -4,3 +4,6 @@ body { font: 13px Arial, sans-serif; background: #b0c4df; margin: 0; padding: 70
 .slds-form-element__label { color: #555; font-size: 12px; }
 a { color: #0b5cab; }
 .hidden { display: none; }
+.cols { display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; align-items: start; }
+.slds-card, .slds-section { border: 1px solid #ddd; border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; }
+.slds-section__title button { border: 0; background: #f3f3f3; width: 100%; text-align: left; padding: 6px 8px; font: inherit; font-weight: bold; }

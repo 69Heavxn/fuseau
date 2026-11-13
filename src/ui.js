@@ -249,8 +249,12 @@ export function renderCard(res, opts = {}) {
   const alts = doubt
     ? res.candidates.slice(1).filter((c) => c.pct == null || c.pct >= ALT_MIN_PCT).slice(0, 3)
     : [];
-  const card = h('div', { class: `card ${top.valid ? tb.status : 'bad'}`, 'data-key': res.digits },
+  // numéro mal saisi (indicatif inexistant) : l'alerte passe avant l'heure
+  const warnFirst = !!res.badCc;
+  const warns = res.warnings.map((w) => h('div', { class: 'warn' }, w));
+  const card = h('div', { class: `card ${top.valid && !warnFirst ? tb.status : 'bad'}`, 'data-key': res.digits },
     src,
+    warnFirst && warns,
     tb.el,
     h('div', { class: 'where', style: 'margin-top:8px' },
       h('span', { class: 'cc' }, top.country),
@@ -260,7 +264,7 @@ export function renderCard(res, opts = {}) {
     placeText(top) && h('div', { class: 'place' }, placeText(top)),
     top.zonesNote && h('div', { class: 'note' }, top.zonesNote),
     numberRow(top),
-    res.warnings.map((w) => h('div', { class: 'warn' }, w)),
+    !warnFirst && warns,
     doubt && doubtBox(top, alts, now),
   );
   return card;

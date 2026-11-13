@@ -31,6 +31,7 @@ export const HOW_WEIGHT = {
   ccNoPlus: 0.6, // 33612345678 : indicatif sans + ni 00
   ccNoPlusNanp: 0.9, // 1 514 … : très courant en Amérique du Nord
   fixedTrunkZero: 0.95, // +33 (0)6… ou +33 06… : 0 en trop retiré
+  badCcLiteral: 0.1, // +14-(0)3…  lu +1 4… en ignorant le (0) : peu probable
   other: 0.1,
 };
 
@@ -47,6 +48,13 @@ export const MOBILE_BONUS = 2;
 export const RARE_RANGES = {
   CH: ['68', '69'], // mobiles suisses récents ; les vrais portables sont en 075-079
 };
+
+// Fiche Salesforce : le champ téléphone de la section dont le titre contient
+// ce mot passe avant tous les autres numéros de la page.
+export const PHONE_SECTION = 'entreprise';
+// Numéros trouvés hors d'un champ "Téléphone/Mobile…" : ignorés en dessous de
+// ce nombre de chiffres (évite les références, compteurs, identifiants…).
+export const MIN_DIGITS_OUTSIDE_PHONE_FIELD = 8;
 
 // Numéro jugé clair (la bulle n'affiche que l'essentiel) si le pays en tête
 // dépasse CLEAR_THRESHOLD %, ou dépasse CLEAR_LEAD % sans autre pays au-dessus

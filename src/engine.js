@@ -71,6 +71,8 @@ const HOW_TEXT = {
   ccNoPlus: (cc) => `indicatif ${cc} écrit sans + ni 00`,
   ccNoPlusNanp: (cc) => `indicatif ${cc} écrit sans +`,
   fixedTrunkZero: (cc) => `0 en trop après +${cc} retiré`,
+  badCcNational: (cc, bad) => `lu sans le +${bad}, qui n'existe pas`,
+  badCcLiteral: (cc, bad) => `lu +${cc} en ignorant le (0) après +${bad}`,
   other: () => 'format inhabituel',
 };
 
@@ -92,9 +94,12 @@ function clean(raw) {
   const em = s.match(/\s*(?:ext\.?|extension|poste|p\.|x|#)\s*(\d{1,6})\s*$/i);
   if (em && s.replace(em[0], '').replace(/\D/g, '').length >= 7) { ext = em[1]; s = s.slice(0, em.index); }
   const zeroParen = /\(\s*0\s*\)/.test(s);
+  // "+33 (0)6…" : ce qui précède le (0) est l'indicatif tel que le client l'a tapé
+  const zp = s.match(/^[\s(]*(?:\+|00)[\s(]*(\d[\d\s.\-]{0,5}?)[\s.\-)]*\(\s*0\s*\)/);
+  const typedCc = zp && zp[1].replace(/\D/g, '').length <= 3 ? zp[1].replace(/\D/g, '') : null;
   s = s.replace(/\(\s*0\s*\)/g, '');
   const plus = /^[\s(]*\+/.test(s);
-  return { plus, digits: s.replace(/\D/g, ''), ext, zeroParen };
+  return { plus, digits: s.replace(/\D/g, ''), ext, zeroParen, typedCc };
 }
 
 function placeOf(digits) {
@@ -149,7 +154,7 @@ function countriesForCode(cc) {
  */
 export function analyze(raw, ctx = {}) {
   init();
-  const { plus, digits, ext, zeroParen } = clean(raw);
+  const { plus, digits, ext, zeroParen, typedCc } = clean(raw);
   const res = { raw: String(raw ?? ''), digits, ext, candidates: [], warnings: [], explicit: false };
   if (digits.length < 6) { res.status = 'empty'; return res; }
   if (digits.length > 17) { res.status = 'invalid'; res.warnings.push('Trop de chiffres pour un numéro de téléphone.'); return res; }
@@ -158,7 +163,8 @@ export function analyze(raw, ctx = {}) {
   const hint = emailCc && !EMAIL_HINT_IGNORE.includes(emailCc) ? emailCc : null;
   const groups = groupsOf(raw);
   const cands = new Map();
-  const add = (p, how) => {
+  // shown : façon de lire affichée au commercial (si différente de celle qui sert au calcul)
+  const add = (p, how, shown = how) => {
     if (!p || !p.isValid()) return;
     const c = p.country || countriesForCode(p.countryCallingCode)[0];
     let prior = COUNTRY_PRIOR[c] ?? DEFAULT_PRIOR;
@@ -179,12 +185,23 @@ export function analyze(raw, ctx = {}) {
     }
     const prev = cands.get(p.number);
     if (prev && prev.weight >= w) return;
-    cands.set(p.number, { p, country: c, how, weight: w, hinted: hint === c });
+    cands.set(p.number, { p, country: c, how: shown, weight: w, hinted: hint === c });
   };
 
   let intlRest = null;
   let intlHow = null;
-  if (plus) { intlRest = digits; intlHow = zeroParen ? 'fixedTrunkZero' : 'plus'; }
+  let natDigits = digits;
+  // "+14-(0)3 05 88 91 01" : l'indicatif tapé avant le (0) n'existe pas.
+  // On ne coupe rien en silence : numéro signalé comme mal saisi, lectures possibles en doute.
+  const intl00 = !plus && digits.startsWith('00');
+  const badCc = typedCc && (plus || intl00) && !meta.hasCallingCode(typedCc) ? typedCc : null;
+  if (badCc) {
+    const body = intl00 ? digits.replace(/^00+/, '') : digits;
+    natDigits = '0' + body.slice(badCc.length);
+    res.badCc = badCc;
+    res.warnings.push(`L'indicatif +${badCc} n'existe pas : numéro mal saisi, à vérifier avec le client.`);
+    add(parse('+' + body), 'badCcLiteral');
+  } else if (plus) { intlRest = digits; intlHow = zeroParen ? 'fixedTrunkZero' : 'plus'; }
   else if (digits.startsWith('00')) { intlRest = digits.replace(/^00+/, ''); intlHow = 'intl00'; }
   else if (digits.startsWith('011') && digits.length >= 11) { intlRest = digits.slice(3); intlHow = 'intl011'; }
 
@@ -204,20 +221,20 @@ export function analyze(raw, ctx = {}) {
   if (!res.explicit && (!intlRest || intlHow === 'intl011')) {
     // numéro sans indicatif : on l'essaie dans tous les pays
     for (const c of COUNTRIES) {
-      const p = parse(digits, c);
+      const p = parse(natDigits, c);
       if (!p || !p.isValid()) continue;
       const nn = p.nationalNumber;
       let how = 'other';
-      if (digits.endsWith(nn)) {
-        const stripped = digits.slice(0, digits.length - nn.length);
+      if (natDigits.endsWith(nn)) {
+        const stripped = natDigits.slice(0, natDigits.length - nn.length);
         const trunk = trunkOf(p.country || c);
         if (stripped === '') how = trunk && p.countryCallingCode !== '1' ? 'bareMissingTrunk' : 'bareNoTrunk';
         else if (stripped === p.countryCallingCode) how = p.countryCallingCode === '1' ? 'ccNoPlusNanp' : 'ccNoPlus';
         else if (trunk && stripped === trunk) how = 'trunk';
       }
-      add(p, how);
+      add(p, how, badCc ? 'badCcNational' : how);
     }
-    const p = parse('+' + digits);
+    const p = !badCc && parse('+' + digits);
     if (p && p.isValid()) add(p, p.countryCallingCode === '1' ? 'ccNoPlusNanp' : 'ccNoPlus');
   }
 
@@ -239,7 +256,7 @@ export function analyze(raw, ctx = {}) {
         type: type || null,
         typeText: TYPE_FR[type] || '',
         how: x.how,
-        howText: HOW_TEXT[x.how](p.countryCallingCode),
+        howText: HOW_TEXT[x.how](p.countryCallingCode, badCc),
         hinted: x.hinted,
         pct: Math.round((100 * x.weight) / total),
         zones: (type === 'MOBILE' && mobileZones[x.country]) || longest(tzMap, e164digits) || [],
@@ -248,10 +265,10 @@ export function analyze(raw, ctx = {}) {
       };
     });
     const top = res.candidates[0];
-    top.certain = res.explicit || top.pct >= 97;
+    top.certain = !badCc && (res.explicit || top.pct >= 97);
     // clair = pas besoin d'afficher de doute ni d'autres pays
     const second = res.candidates[1] ? res.candidates[1].pct : 0;
-    res.clear = top.certain || top.pct >= CLEAR_THRESHOLD || (top.pct >= CLEAR_LEAD && second < CLEAR_RUNNER_UP);
+    res.clear = !badCc && (top.certain || top.pct >= CLEAR_THRESHOLD || (top.pct >= CLEAR_LEAD && second < CLEAR_RUNNER_UP));
     res.status = 'ok';
     if (ext) res.warnings.push(`Poste ${ext} indiqué après le numéro.`);
     return res;
@@ -300,11 +317,11 @@ export function analyze(raw, ctx = {}) {
   // national non reconnu : pays où la longueur est au moins possible
   const possible = [];
   for (const c of COUNTRIES) {
-    const p = parse(digits, c);
+    const p = parse(natDigits, c);
     if (p && p.isPossible()) possible.push({ p, c: p.country || c, w: COUNTRY_PRIOR[p.country || c] ?? DEFAULT_PRIOR });
   }
   possible.sort((a, b) => b.w - a.w);
-  res.warnings.push('Numéro non reconnu dans aucun pays : il est peut-être mal saisi.');
+  if (!badCc) res.warnings.push('Numéro non reconnu dans aucun pays : il est peut-être mal saisi.');
   const seen = new Set();
   for (const { p, c } of possible) {
     if (seen.has(p.number) || seen.size >= 3) continue;
@@ -328,13 +345,13 @@ export function analyze(raw, ctx = {}) {
 }
 
 // ------------------------------------------------- recherche dans un texte
-const PHONE_RE = /(?:\+|\b00|\(\+)?\d[\d\s.\-()/ ]{5,22}\d/g;
-export function findNumbers(text) {
+const PHONE_RE = /(?:\+|\b00|\(\+)?\d[\d\s.\-()/ ]{3,22}\d/g;
+export function findNumbers(text, minDigits = 8) {
   const out = [];
   for (const m of String(text || '').matchAll(PHONE_RE)) {
     const s = m[0].trim();
     const d = s.replace(/\D/g, '');
-    if (d.length < 8 || d.length > 16) continue;
+    if (d.length < minDigits || d.length > 17) continue;
     if (/^\d{1,2}[/.]\d{1,2}[/.]\d{2,4}$/.test(s)) continue; // dates
     out.push(s);
   }

@@ -133,3 +133,31 @@ test('numéro difficile : probabilités affichées', () => {
     assert.ok(r.candidates.length > 1, n);
   }
 });
+
+test('indicatif inexistant avant le (0) : numéro entier, signalé mal saisi', () => {
+  const r = analyze('+14-(0)312345678');
+  assert.equal(r.badCc, '14');
+  assert.equal(r.clear, false);
+  assert.equal(r.candidates[0].certain, false);
+  assert.match(r.warnings[0], /\+14 n'existe pas/);
+  // lecture la plus probable : 03 12 34 56 78 ; la lecture "+1 431…" n'est plus certaine
+  assert.equal(r.candidates[0].country, 'FR');
+  assert.equal(r.candidates[0].how, 'badCcNational');
+  assert.ok(r.candidates.some((c) => c.callingCode === '1' && c.how === 'badCcLiteral'));
+  // et le texte n'est pas découpé en deux numéros
+  assert.deepEqual(findNumbers('Téléphone +14-(0)312345678'), ['+14-(0)312345678']);
+});
+
+test('(0) après un vrai indicatif : correction sûre', () => {
+  for (const [n, cc] of [['+33 (0)6 12 34 56 78', 'FR'], ['(+33) (0)6 12 34 56 78', 'FR'], ['+44 (0)20 7946 0123', 'GB'], ['0041 (0)79 123 45 67', 'CH']]) {
+    const r = analyze(n);
+    assert.equal(r.clear, true, n);
+    assert.equal(r.candidates[0].country, cc, n);
+    assert.equal(r.badCc, undefined, n);
+  }
+});
+
+test('numéros courts ignorés hors champ téléphone', () => {
+  assert.deepEqual(findNumbers('Appeler le client 482915'), []);
+  assert.deepEqual(findNumbers('482915', 6), ['482915']);
+});

@@ -3,10 +3,14 @@
 import { analyze, findNumbers } from './engine.js';
 import { CSS, h, renderCard, copyText } from './ui.js';
 import { hereTime } from './time.js';
+import { PHONE_SECTION, MIN_DIGITS_OUTSIDE_PHONE_FIELD } from './config.js';
 
 const VERSION = __VERSION__;
 const HOST_ID = 'fuseau-panel-host';
-const PHONE_LABEL = /t[ée]l[ée]?phone|phone|mobile|portable|gsm|cellulaire|appeler|whats ?app|fax|num[ée]ro/i;
+// Libellés de champs téléphone. Volontairement strict : "Appeler le client",
+// "Numéro", "N° dossier"… ne sont PAS des champs téléphone.
+const PHONE_LABEL = /t[ée]l[ée]?phone|(?:^|[\s(])t[ée]l(?:\.|\s|$)|phone|mobile|portable|gsm|cellulaire|whats ?app/i;
+const SECTION_RE = new RegExp(PHONE_SECTION, 'i');
 
 // ---------------------------------------------------------- DOM profond
 function* deepElements(root) {
@@ -51,55 +55,95 @@ function labelFor(el) {
   return '';
 }
 
+// Titre de la section Salesforce qui contient l'élément ("Informations entreprise"…)
+const SECTION = 'records-record-layout-section, force-record-layout-section, flexipage-field-section2, '
+  + 'lightning-accordion-section, .slds-section, .slds-accordion__section, .slds-card, article, section, fieldset';
+const SECTION_TITLE = '.test-id__section-header-title, .slds-section__title, .slds-accordion__summary-content, '
+  + '.slds-accordion__summary-heading, .slds-card__header-title, h2, h3, h4, legend';
+function sectionTitle(el, cache) {
+  for (let a = parentDeep(el); a; a = parentDeep(a)) {
+    if (!a.matches || !a.matches(SECTION)) continue;
+    if (!cache.has(a)) {
+      let t = '';
+      for (const d of deepElements(a)) {
+        if (d === a || !d.matches || !d.matches(SECTION_TITLE)) continue;
+        t = (d.textContent || '').replace(/\s+/g, ' ').trim();
+        if (t && t.length <= 80) break;
+        t = '';
+      }
+      cache.set(a, t);
+    }
+    if (cache.get(a)) return cache.get(a);
+  }
+  return '';
+}
+
 // ------------------------------------------------------------ scan page
-function scanPage() {
+// Rang de chaque numéro trouvé (le plus petit gagne, les autres sont ignorés) :
+//   0  champ téléphone de la section "…entreprise…"
+//   1  autre champ dont le libellé est Téléphone / Mobile / Portable…
+//   2  autre lien d'appel de la page (au moins 8 chiffres)
+//   3  dernier recours : numéro écrit n'importe où dans la page
+const sectionTier = (section, label) => (SECTION_RE.test(section) && (!label || PHONE_LABEL.test(label)) ? 0 : PHONE_LABEL.test(label) ? 1 : 2);
+
+function collect() {
   const found = [];
-  let email = null;
+  const cache = new Map();
   const push = (value, label, el) => {
-    const v = String(value || '').trim();
-    if (v.replace(/\D/g, '').length < 6) return;
-    found.push({ value: v, label: label || '', el });
+    const v = String(value || '').replace(/\s+/g, ' ').trim();
+    const n = v.replace(/\D/g, '').length;
+    if (n < 6 || n > 17) return;
+    const section = sectionTitle(el, cache);
+    const tier = sectionTier(section, label || '');
+    if (tier === 2 && n < MIN_DIGITS_OUTSIDE_PHONE_FIELD) return;
+    found.push({ value: v, label: label || '', section, tier, n });
   };
-
-  const sel = String(window.getSelection ? window.getSelection() : '').trim();
-  const fromSel = sel && !inPanelSelection() && sel.replace(/\D/g, '').length >= 6 && sel.length < 80;
-
+  let email = null;
+  let phoneFields = 0;
   for (const el of deepElements(document)) {
     if (inPanel(el)) continue;
     const tag = el.tagName;
     if (tag === 'A') {
       const href = el.getAttribute('href') || '';
       if (/^mailto:/i.test(href)) { if (!email && visible(el)) email = href.slice(7).split('?')[0]; continue; }
-      if (/^(tel|callto|sip):/i.test(href) && !fromSel && visible(el)) {
+      if (/^(tel|callto|sip):/i.test(href) && visible(el)) {
         push((el.textContent || '').trim() || decodeURIComponent(href.replace(/^[a-z]+:/i, '')), labelFor(el), el);
       }
-    } else if (!fromSel && (tag === 'LIGHTNING-FORMATTED-PHONE' || tag === 'LIGHTNING-CLICK-TO-DIAL') && visible(el)) {
+    } else if ((tag === 'LIGHTNING-FORMATTED-PHONE' || tag === 'LIGHTNING-CLICK-TO-DIAL') && visible(el)) {
       push(el.textContent, labelFor(el), el);
-    }
-  }
-  if (fromSel) return { items: [{ value: sel, label: 'Sélection' }], email, mode: 'selection' };
-
-  // champs dont le libellé parle de téléphone
-  if (!found.length) {
-    for (const el of deepElements(document)) {
-      if (!el.matches || !el.matches(LABEL) || inPanel(el)) continue;
+    } else if (el.matches && el.matches(LABEL)) {
+      // champ dont le libellé parle de téléphone (valeur en texte simple)
       const lbl = (el.textContent || '').replace(/\s+/g, ' ').trim();
       if (!lbl || lbl.length > 60 || !PHONE_LABEL.test(lbl) || !visible(el)) continue;
       const box = closestDeep(el, FIELD);
       if (!box) continue;
+      phoneFields++;
       const text = (box.innerText || box.textContent || '').replace(lbl, ' ');
-      for (const n of findNumbers(text)) push(n, lbl, box);
+      for (const n of findNumbers(text, 6)) push(n, lbl, box);
     }
   }
-  // dernier recours : tout le texte visible
+  return { found, email, phoneFields };
+}
+
+function scanPage() {
+  const sel = String(window.getSelection ? window.getSelection() : '').trim();
+  const fromSel = sel && !inPanelSelection() && sel.replace(/\D/g, '').length >= 6 && sel.length < 80;
+  const { found, email, phoneFields } = collect();
+  if (fromSel) return { items: [{ value: sel, label: 'Sélection' }], email, mode: 'selection' };
+
+  // dernier recours (page sans champ téléphone) : tout le texte visible.
+  // Si la fiche a un champ Téléphone mais vide, on ne va pas chercher ailleurs.
+  if (!found.length && phoneFields) return { items: [], email, mode: 'page', emptyField: true };
   if (!found.length) {
     const text = document.body ? document.body.innerText : '';
-    for (const n of findNumbers(text).slice(0, 6)) push(n, '', null);
+    for (const v of findNumbers(text).slice(0, 6)) found.push({ value: v, label: '', tier: 3 });
   }
+  const best = Math.min(...found.map((f) => f.tier));
 
-  // dédoublonnage (même chiffres = même numéro)
+  // dédoublonnage (mêmes chiffres = même numéro), seulement le meilleur rang
   const byDigits = new Map();
   for (const f of found) {
+    if (f.tier !== best) continue;
     const k = f.value.replace(/\D/g, '').replace(/^00/, '');
     if (!byDigits.has(k)) byDigits.set(k, { value: f.value, labels: [] });
     const rec = byDigits.get(k);
@@ -142,12 +186,26 @@ function diagnostic() {
       }
     }
   }
+  // titres de sections de la fiche (noms de rubriques, pas de données client)
+  const sections = [];
+  for (const el of deepElements(document)) {
+    if (sections.length >= 15 || inPanel(el)) continue;
+    if (el.matches && el.matches('.test-id__section-header-title, .slds-section__title, .slds-accordion__summary-content') && visible(el)) {
+      const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+      if (t && t.length < 60 && !/\d/.test(t) && !sections.includes(t)) sections.push(t);
+    }
+  }
+  const cands = collect().found.map((f) =>
+    `rang ${f.tier} · "${f.label || 'sans libellé'}" · section "${PHONE_SECTION}": ${SECTION_RE.test(f.section) ? 'oui' : 'non'} · ${f.n} chiffres`);
   return [
     `Fuseau ${VERSION} · diagnostic`,
     `page: ${location.host}${location.pathname.replace(/\/[a-zA-Z0-9]{15,18}(?=\/|$)/g, '/ID')}`,
     `navigateur: ${navigator.userAgent}`,
     `éléments: ${total} · shadow roots: ${shadows}`,
     `liens tel: ${tel} (visibles ${telVis}) · lightning-formatted-phone: ${lfp} (visibles ${lfpVis})`,
+    `sections: ${sections.join(' | ') || 'aucune trouvée'}`,
+    'numéros candidats (sans les chiffres) :',
+    ...(cands.length ? cands.map((c) => '  ' + c) : ['  aucun']),
     'libellés téléphone visibles :',
     ...labels.map((l) => '  ' + l),
   ].join('\n');
@@ -242,7 +300,7 @@ function render(state) {
       diag.textContent = ok ? 'Diagnostic copié ✓ (colle-le à Claude)' : 'Échec de la copie';
     });
     cards.push(h('div', { class: 'card' },
-      h('div', { class: 'empty' }, 'Aucun numéro trouvé sur cette page.'),
+      h('div', { class: 'empty' }, state.data.emptyField ? 'Le champ Téléphone est vide sur cette fiche.' : 'Aucun numéro trouvé sur cette page.'),
       h('div', { class: 'note' }, 'Sélectionne le numéro à la souris puis reclique sur le favori, ou colle-le en bas.'),
       h('div', { style: 'margin-top:10px' }, diag)));
   }

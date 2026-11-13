@@ -18,6 +18,11 @@ Tout est calculé dans le navigateur : aucun numéro n'est envoyé nulle part.
 2. Glisser le bouton noir **Fuseau** dans la barre de favoris.
 3. Sur une fiche Salesforce : clic sur **Fuseau**. `Échap` ou × pour fermer.
 
+Le favori lit en priorité le champ **Téléphone** de la section « Informations
+entreprise ». S'il est vide : les autres champs Téléphone / Mobile / Portable de la fiche.
+Les autres numéros de la page (« Appeler le client », numéro de dossier…) sont ignorés.
+Le mot cherché dans le titre de section se règle dans `src/config.js` (`PHONE_SECTION`).
+
 Si la bulle ne trouve pas le numéro : le sélectionner à la souris puis recliquer.
 Sinon, bouton « Copier un diagnostic » et envoyer le texte (il ne contient aucun numéro).
 
@@ -32,6 +37,9 @@ Sinon, bouton « Copier un diagnostic » et envoyer le texte (il ne contient auc
 3. Les DOM écrits à la française (0692…, 0590…) sont reconnus comme tels.
 4. Numéro invalide : le pays est quand même donné quand l'indicatif est connu, avec
    l'erreur probable (ex. « un chiffre en trop »).
+5. Le numéro est toujours lu en entier. Indicatif qui n'existe pas (ex. `+14-(0)3…`) :
+   alerte « numéro mal saisi » en tête de bulle, et les lectures possibles en doute,
+   jamais présentées comme certaines.
 
 Quand le pays est clair, la bulle n'affiche que l'essentiel (heure, couleur, pays,
 lieu, numéro corrigé). Les probabilités et les autres pays possibles n'apparaissent
